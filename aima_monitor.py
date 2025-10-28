@@ -6,10 +6,15 @@ Script de Monitoramento Automatizado da AIMA - VERSÃO CLOUD
 import asyncio
 import json
 import os
+import sys
 import smtplib
 from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from playwright.async_api import async_playwright
+
+print("="*70, flush=True)
+print("🚀 AIMA Monitor Cloud - Iniciando...", flush=True)
+print("="*70, flush=True)
 
 # Configurações
 AIMA_EMAIL = os.getenv("AIMA_EMAIL")
@@ -26,6 +31,7 @@ RUN_HEADLESS = os.getenv("RUN_HEADLESS", "True").lower() == "true"
 MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
 
 def validate_config():
+    print("\n→ Validando configurações...", flush=True)
     required_vars = {
         "AIMA_EMAIL": AIMA_EMAIL,
         "AIMA_PASSWORD": AIMA_PASSWORD,
@@ -35,10 +41,11 @@ def validate_config():
     }
     missing = [var for var, val in required_vars.items() if not val]
     if missing:
-        print("❌ ERRO: Variáveis de ambiente faltando:")
+        print("❌ ERRO: Variáveis de ambiente faltando:", flush=True)
         for var in missing:
-            print(f"   - {var}")
+            print(f"   - {var}", flush=True)
         return False
+    print("✓ Todas as variáveis configuradas!", flush=True)
     return True
 
 def load_last_status():
@@ -48,7 +55,7 @@ def load_last_status():
                 data = json.load(f)
                 return data.get('status', '')
         except Exception as e:
-            print(f"Erro ao carregar status anterior: {e}")
+            print(f"⚠️  Erro ao carregar status anterior: {e}", flush=True)
     return None
 
 def save_status(status):
@@ -59,9 +66,9 @@ def save_status(status):
                 'status': status,
                 'timestamp': datetime.now().isoformat()
             }, f, ensure_ascii=False, indent=2)
-        print(f"✓ Status salvo em: {STATUS_FILE}")
+        print(f"✓ Status salvo", flush=True)
     except Exception as e:
-        print(f"✗ Erro ao salvar status: {e}")
+        print(f"✗ Erro ao salvar status: {e}", flush=True)
 
 def send_email_notification(subject, body, old_status, new_status):
     html_body = f"""
@@ -93,10 +100,10 @@ def send_email_notification(subject, body, old_status, new_status):
             server.starttls()
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
             server.send_message(msg)
-        print(f"✓ E-mail enviado para {RECEIVER_EMAIL}")
+        print(f"✓ E-mail enviado para {RECEIVER_EMAIL}", flush=True)
         return True
     except Exception as e:
-        print(f"✗ Erro ao enviar e-mail: {e}")
+        print(f"✗ Erro ao enviar e-mail: {e}", flush=True)
         return False
 
 async def extract_status_from_page(page):
@@ -119,97 +126,106 @@ async def extract_status_from_page(page):
                                 return next_line
         return None
     except Exception as e:
-        print(f"Erro ao extrair status: {e}")
+        print(f"✗ Erro ao extrair status: {e}", flush=True)
         return None
 
 async def check_status_once():
-    print(f"\n{'='*70}")
-    print(f"Verificação em {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}")
-    print('='*70)
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=RUN_HEADLESS)
-        context = await browser.new_context()
-        page = await context.new_page()
-        try:
-            print("→ Acessando AIMA...")
-            await page.goto(AIMA_LOGIN_URL, wait_until='domcontentloaded', timeout=30000)
-            await asyncio.sleep(2)
-            print("→ Fazendo login...")
-            await page.fill("input[name='email']", AIMA_EMAIL)
-            await page.fill("input[name='password']", AIMA_PASSWORD)
-            async with page.expect_navigation(timeout=30000):
-                await page.click("button[type='submit']")
-            await asyncio.sleep(3)
-            print("→ Verificando status...")
-            current_status = await extract_status_from_page(page)
-            if current_status:
-                print(f"✓ Status: {current_status}")
-                last_status = load_last_status()
-                if last_status and last_status != current_status:
-                    print("\n🚨 MUDANÇA DE STATUS DETECTADA!")
-                    print(f"   Anterior: {last_status}")
-                    print(f"   Atual: {current_status}\n")
-                    send_email_notification(
-                        subject="🚨 Status AIMA Atualizado!",
-                        body="Status alterado",
-                        old_status=last_status,
-                        new_status=current_status
-                    )
-                elif not last_status:
-                    print("✓ Primeira verificação. Status salvo.")
+    print(f"\n{'='*70}", flush=True)
+    print(f"🔍 Verificação em {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}", flush=True)
+    print('='*70, flush=True)
+    
+    try:
+        async with async_playwright() as p:
+            print("→ Iniciando navegador...", flush=True)
+            browser = await p.chromium.launch(headless=RUN_HEADLESS)
+            context = await browser.new_context()
+            page = await context.new_page()
+            
+            try:
+                print("→ Acessando AIMA...", flush=True)
+                await page.goto(AIMA_LOGIN_URL, wait_until='domcontentloaded', timeout=30000)
+                await asyncio.sleep(2)
+                
+                print("→ Fazendo login...", flush=True)
+                await page.fill("input[name='email']", AIMA_EMAIL)
+                await page.fill("input[name='password']", AIMA_PASSWORD)
+                
+                async with page.expect_navigation(timeout=30000):
+                    await page.click("button[type='submit']")
+                
+                await asyncio.sleep(3)
+                
+                print("→ Verificando status...", flush=True)
+                current_status = await extract_status_from_page(page)
+                
+                if current_status:
+                    print(f"✓ Status atual: {current_status}", flush=True)
+                    
+                    last_status = load_last_status()
+                    
+                    if last_status and last_status != current_status:
+                        print("\n🚨 MUDANÇA DE STATUS DETECTADA!", flush=True)
+                        print(f"   Anterior: {last_status}", flush=True)
+                        print(f"   Atual: {current_status}\n", flush=True)
+                        send_email_notification(
+                            subject="🚨 Status AIMA Atualizado!",
+                            body="Status alterado",
+                            old_status=last_status,
+                            new_status=current_status
+                        )
+                    elif not last_status:
+                        print("✓ Primeira verificação. Status salvo.", flush=True)
+                    else:
+                        print("✓ Sem mudanças.", flush=True)
+                    
+                    save_status(current_status)
+                    return True
                 else:
-                    print("✓ Sem mudanças.")
-                save_status(current_status)
-                return True
-            else:
-                print("✗ Não foi possível extrair o status.")
-                return False
-        except Exception as e:
-            print(f"✗ Erro: {e}")
-            return False
-        finally:
-            await browser.close()
+                    print("✗ Não foi possível extrair o status.", flush=True)
+                    return False
+            
+            finally:
+                await browser.close()
+                
+    except Exception as e:
+        print(f"✗ Erro na verificação: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        return False
 
 async def monitor_loop():
-    print("\n" + "="*70)
-    print("🔍 MONITOR AUTOMÁTICO DA AIMA - MODO CLOUD")
-    print("="*70)
-    print(f"Intervalo: {CHECK_INTERVAL_MINUTES} minutos")
-    print(f"Headless: {'Sim' if RUN_HEADLESS else 'Não'}")
-    print("="*70 + "\n")
+    print("\n" + "="*70, flush=True)
+    print("🔍 MONITOR AUTOMÁTICO DA AIMA - MODO CLOUD", flush=True)
+    print("="*70, flush=True)
+    print(f"Intervalo: {CHECK_INTERVAL_MINUTES} minutos", flush=True)
+    print(f"Headless: {'Sim' if RUN_HEADLESS else 'Não'}", flush=True)
+    print("="*70 + "\n", flush=True)
+    
     check_count = 0
+    
     while True:
         try:
             check_count += 1
-            print(f"\n{'─'*70}")
-            print(f"Verificação #{check_count}")
-            print(f"{'─'*70}")
+            print(f"\n{'─'*70}", flush=True)
+            print(f"Verificação #{check_count}", flush=True)
+            print(f"{'─'*70}", flush=True)
+            
             success = False
             for attempt in range(1, MAX_RETRIES + 1):
                 if attempt > 1:
-                    print(f"⟳ Tentativa {attempt}/{MAX_RETRIES}...")
+                    print(f"⟳ Tentativa {attempt}/{MAX_RETRIES}...", flush=True)
+                
                 success = await check_status_once()
+                
                 if success:
                     break
                 elif attempt < MAX_RETRIES:
+                    print("⏳ Aguardando 30 segundos...", flush=True)
                     await asyncio.sleep(30)
+            
             if not success:
-                print(f"✗ Falha após {MAX_RETRIES} tentativas.")
+                print(f"✗ Falha após {MAX_RETRIES} tentativas.", flush=True)
+            
             next_check = datetime.now() + timedelta(minutes=CHECK_INTERVAL_MINUTES)
-            print(f"\n⏰ Próxima verificação: {next_check.strftime('%d/%m/%Y às %H:%M:%S')}")
-            await asyncio.sleep(CHECK_INTERVAL_MINUTES * 60)
-        except KeyboardInterrupt:
-            print("\n⛔ Interrompido")
-            break
-        except Exception as e:
-            print(f"\n✗ Erro: {e}")
-            await asyncio.sleep(300)
-
-if __name__ == "__main__":
-    print("\n🚀 Iniciando Monitor AIMA...\n")
-    if not validate_config():
-        exit(1)
-    try:
-        asyncio.run(monitor_loop())
-    except KeyboardInterrupt:
-        print("\n✓ Finalizado.")
+            print(f"\n⏰ Próxima verificação: {next_check.strftime('%d/%m/%Y às %H:%M:%S')}", flush=True)
+            print(f"   (aguardando {CHECK_INTERVAL_MI
