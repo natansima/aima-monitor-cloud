@@ -228,34 +228,4 @@ async def monitor_loop():
             
             next_check = datetime.now() + timedelta(minutes=CHECK_INTERVAL_MINUTES)
             print(f"\n⏰ Próxima verificação: {next_check.strftime('%d/%m/%Y às %H:%M:%S')}", flush=True)
-            print(f"   (aguardando {CHECK_INTERVAL_MINUTES} minutos...)\n", flush=True)
-            
-            await asyncio.sleep(CHECK_INTERVAL_MINUTES * 60)
-            
-        except KeyboardInterrupt:
-            print("\n⛔ Monitoramento interrompido", flush=True)
-            break
-        except Exception as e:
-            print(f"\n✗ Erro no loop: {e}", flush=True)
-            import traceback
-            traceback.print_exc()
-            print("⏳ Aguardando 5 minutos antes de continuar...", flush=True)
-            await asyncio.sleep(300)
-
-if __name__ == "__main__":
-    try:
-        if not validate_config():
-            print("\n❌ Finalizando devido a erro de configuração", flush=True)
-            sys.exit(1)
-        
-        print("\n✓ Configuração validada com sucesso!", flush=True)
-        print("→ Iniciando loop de monitoramento...\n", flush=True)
-        
-        asyncio.run(monitor_loop())
-    except KeyboardInterrupt:
-        print("\n✓ Programa finalizado.", flush=True)
-    except Exception as e:
-        print(f"\n❌ Erro fatal: {e}", flush=True)
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+            print(f"   (aguardando {CHECK_INTERVAL_MI
