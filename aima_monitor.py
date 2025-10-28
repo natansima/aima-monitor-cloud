@@ -137,23 +137,58 @@ async def check_status_once():
     try:
         async with async_playwright() as p:
             print("→ Iniciando navegador...", flush=True)
-            browser = await p.chromium.launch(headless=RUN_HEADLESS)
-            context = await browser.new_context()
+            browser = await p.chromium.launch(
+                headless=RUN_HEADLESS,
+                args=[
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-blink-features=AutomationControlled'
+                ]
+            )
+            
+            # Configurar contexto com user agent real
+            context = await browser.new_context(
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                viewport={'width': 1920, 'height': 1080},
+                locale='pt-PT',
+                timezone_id='Europe/Lisbon'
+            )
+            
             page = await context.new_page()
             
             try:
                 print("→ Acessando AIMA...", flush=True)
-                await page.goto(AIMA_LOGIN_URL, wait_until='domcontentloaded', timeout=30000)
-                await asyncio.sleep(2)
                 
-                print("→ Fazendo login...", flush=True)
-                await page.fill("input[name='email']", AIMA_EMAIL)
-                await page.fill("input[name='password']", AIMA_PASSWORD)
-                
-                async with page.expect_navigation(timeout=30000):
-                    await page.click("button[type='submit']")
+                # Aumentar timeout e tentar múltiplas estratégias
+                try:
+                    await page.goto(AIMA_LOGIN_URL, wait_until='networkidle', timeout=60000)
+                except Exception as e:
+                    print(f"⚠️  Primeira tentativa falhou, tentando com 'load'...", flush=True)
+                    await page.goto(AIMA_LOGIN_URL, wait_until='load', timeout=60000)
                 
                 await asyncio.sleep(3)
+                
+                print("→ Fazendo login...", flush=True)
+                
+                # Verificar se os campos existem
+                try:
+                    await page.wait_for_selector("input[name='email']", timeout=10000)
+                except Exception:
+                    print("⚠️  Campo de email não encontrado, tentando seletor alternativo...", flush=True)
+                    await page.wait_for_selector("input[type='email']", timeout=10000)
+                
+                await page.fill("input[name='email']", AIMA_EMAIL)
+                await asyncio.sleep(1)
+                await page.fill("input[name='password']", AIMA_PASSWORD)
+                await asyncio.sleep(1)
+                
+                print("→ Enviando formulário...", flush=True)
+                
+                async with page.expect_navigation(timeout=60000):
+                    await page.click("button[type='submit']")
+                
+                await asyncio.sleep(5)
                 
                 print("→ Verificando status...", flush=True)
                 current_status = await extract_status_from_page(page)
@@ -182,6 +217,12 @@ async def check_status_once():
                     return True
                 else:
                     print("✗ Não foi possível extrair o status.", flush=True)
+                    # Salvar screenshot para debug
+                    try:
+                        await page.screenshot(path="/app/data/debug_screenshot.png")
+                        print("📸 Screenshot salvo em /app/data/debug_screenshot.png", flush=True)
+                    except:
+                        pass
                     return False
             
             finally:
@@ -192,6 +233,7 @@ async def check_status_once():
         import traceback
         traceback.print_exc()
         return False
+
 
 async def monitor_loop():
     print("\n" + "="*70, flush=True)
