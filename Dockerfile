@@ -9,10 +9,15 @@ COPY aima_monitor.py .
 # Instalar dependências Python
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Instalar navegador Chromium do Playwright
+RUN playwright install chromium
+RUN playwright install-deps chromium
+
 # Criar diretório de dados
 RUN mkdir -p /app/data
 
-# Variáveis de ambiente para Playwright
+# Variáveis de ambiente
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENV PYTHONUNBUFFERED=1
 
-CMD ["python", "aima_monitor.py"]
+CMD ["python", "-u", "aima_monitor.py"]
